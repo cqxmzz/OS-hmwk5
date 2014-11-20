@@ -1,0 +1,3 @@
+378
+int expose_page_table(pid_t pid, unsigned long fake_pgd,
+		     	unsigned long addr);
