@@ -20,39 +20,47 @@ static int pgnum2index(int num)
 #define file_bit(pte)   ((pte & (1<<2))  >> 2)
 #define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
 #define rdonly_bit(pte) ((pte & (1<<7))  >> 7)
-#define user_bit(pte)   ((pte & (1<<8))  >> 8)
+/* citation
+ http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/BGEIHGIF.html
+*/
+#define xn_bit(pte)   (pte & 1)
 #define phys(pte)   (pte >> 12)
 
-static unsigned long * expose(int pid)
+static int expose(int pid, void *pgd_addr, void *addr)
 {
-	int fd = open("/dev/zero", O_RDONLY);
-	void *addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
-				 MAP_SHARED, fd, 0);
-	void *pgd_addr = mmap(NULL, PGD_SIZE * 2, PROT_READ,
-				 MAP_SHARED, fd, 0);
-	close(fd);
-	if (addr == MAP_FAILED) {
-		printf("Error: mmap");
-		return NULL;
-	}
-	if (pgd_addr == MAP_FAILED) {
-		printf("Error: mmap");
-		return NULL;
-	}
+	// int fd = open("/dev/zero", O_RDONLY);
+	// void *addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
+	// 			 MAP_SHARED, fd, 0);
+	// void *pgd_addr = mmap(NULL, PGD_SIZE * 2, PROT_READ,
+	// 			 MAP_SHARED, fd, 0);
+	// close(fd);
+	// if (addr == MAP_FAILED) {
+	// 	printf("Error: mmap\n");
+	// 	return NULL;
+	// }
+	// if (pgd_addr == MAP_FAILED) {
+	// 	printf("Error: mmap\n");
+	// 	return NULL;
+	// }
 	if (syscall(378, pid, (unsigned long)pgd_addr,
 			(unsigned long)addr) < 0) {
-		printf("Error: expose_page_table syscall");
-		return NULL;
+		printf("Error: expose_page_table syscall\n");
+		return -1;
 	}
-	printf("%p ", addr);
-	printf("%p ", pgd_addr[1]);
-	return addr;
+	if (pgd_addr == NULL)
+		return -1;
+	if (addr == NULL)
+		return -1;
+	// printf("%p ", addr);
+	// printf("%p ", pgd_addr[1]);
+	return 0;
 }
 
 int main(int argc, char **argv)
 {
 	int i;
-	unsigned long *page_table = NULL, *page = NULL;
+	unsigned long *page = NULL;
+	unsigned long *pgd_i = NULL;
 	int pid;
 	int verbose = 0;
 
@@ -62,17 +70,37 @@ int main(int argc, char **argv)
 	if(argv[1][0] == '-' && argv[1][1] == 'v')
 		verbose = 1;
 
-	/* second argument is pid*/
+	/* last argument is pid*/
 	pid = atoi(argv[argc-1]);
 
-	page_table = expose(pid);
+	int fd = open("/dev/zero", O_RDONLY);
+	unsigned long *pte_addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
+				MAP_SHARED, fd, 0);
+	unsigned long *pgd_addr = mmap(NULL, PGD_SIZE * 2, PROT_READ,
+				MAP_SHARED, fd, 0);
+	close(fd);
 
-	if (page_table == NULL) {
+	if (pte_addr == MAP_FAILED) {
+		printf("Error: mmap\n");
+		return -1;
+	}
+	if (pgd_addr == MAP_FAILED) {
+		printf("Error: mmap\n");
 		return -1;
 	}
 
+	if(expose(pid, pgd_addr, pte_addr) < 0)
+		return -1;
+
+	/* itrate the fake_pgd, find valid entry */
+	for (pgd_i = pgd_addr; pgd_i - pgd_addr < 4096; pgd_i += 2) {
+		if ( (void *)pgd_i[1] != NULL)
+			break;
+	}
+
+	/* iterate all entries of ptes */
 	for (i = 0; i < PAGE_TABLE_SIZE / sizeof(int); i++) {
-		page = &page_table[pgnum2index(i)];
+		page = &pte_addr[pgnum2index(i)];
 
 		if (page == NULL)
 			continue;
@@ -81,26 +109,23 @@ int main(int argc, char **argv)
 				printf("0x400 0x10000000 0 0 0 0 0 0\n");
 			continue;
 		}
-		printf("%x ", i);
+		/* printf("%x ", i); */
+		printf("%p", (void *)pgd_i[1]);
 		printf("%p ", page);
 		printf("%p ", (void *)phys(*page));
 		printf("%lu ", young_bit(*page));
 		printf("%lu ", file_bit(*page));
 		printf("%lu ", dirty_bit(*page));
 		printf("%lu ", rdonly_bit(*page));
-		printf("%lu ", user_bit(*page));
+		printf("%lu ", xn_bit(*page));
 		printf("\n");
 	}
-	for (i = 0; i < PAGE_TABLE_SIZE / sizeof(int); i++) {
-		page = page_table[i];
-		printf("%p\n", page);
-	}
-	munmap(page_table, PAGE_TABLE_SIZE * 2);
-	//munmap(page_table, PGD_SIZE * 2);
-        //free(page_table);
-        //free(page);
-        page_table = NULL;
+
+	munmap(pte_addr, PAGE_TABLE_SIZE * 2);
+	munmap(pgd_addr, PGD_SIZE * 2);
+
+        pgd_addr = NULL;
+	pte_addr = NULL;
         page = NULL;
         return 0;
 }
-
