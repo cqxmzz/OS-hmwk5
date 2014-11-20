@@ -23,6 +23,7 @@ int copy_pte_to_user(pte_t *pte, struct task_struct *task, unsigned long address
 		pte_unmap(pte);
 		return -EINVAL;
 	}
+	munmap((void *)mapped_to_addr, PAGE_SIZE);
 	if (remap_pfn_range(vma, mapped_to_addr, phys,
 			PAGE_SIZE, vma->vm_page_prot)) {
 		pte_unmap(pte);
