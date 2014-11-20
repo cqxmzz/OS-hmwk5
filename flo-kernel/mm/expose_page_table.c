@@ -98,7 +98,7 @@ static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
 	list_for_each(pos, &p->tasks) {
 		task = list_entry(pos, struct task_struct, tasks);
 		taskmm = task->mm;
-		if (taskmm->pg_addrs && taskmm->pg_addrs->task->pid == current->pid) {
+		if (taskmm && taskmm->pg_addrs && taskmm->pg_addrs->task->pid == current->pid) {
 			list_for_each(pglist, &taskmm->pg_addrs->list) {
 				epga = list_entry(pglist,
 					struct expose_pg_addrs, list);
@@ -166,6 +166,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	printk("check_user_vma_is_valid");
 	/* check user address valid */
 	user_vma = check_user_vma_is_valid(current->mm, address);
+	printk("check_user_vma_is_valid_done");
 	if (!user_vma) {
 		kfree(pg_addrs);
 		up_read(&(mm->mmap_sem));
