@@ -64,7 +64,7 @@ check_user_vma_is_valid(struct mm_struct *mm, unsigned long address)
 
 SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 				unsigned long __user, fake_pgd,
-				unsigned long __user, addr)
+				unsigned long __user, address)
 {
 	/* Qiming Chen */
 	struct mm_struct *mm;
@@ -73,15 +73,12 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	struct expose_pg_addrs *pg_addrs;
 	struct task_struct *task;
 	int errno;
-
-	/* check valid */
-	if (pid == NULL || addr == NULL || fake_pgd == NULL)
-		return -EINVAL;
 	
 	/* self */
-	if (pid == -1)
+	if (pid == -1) {
 		task = current;
 		mm = current->mm;
+	}
 	else {
 		task = find_task_by_vpid(pid);
 		if (!task)
