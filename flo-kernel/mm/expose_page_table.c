@@ -6,8 +6,34 @@
 
 
 
-int copy_pte_to_user(pte_t *pte, struct mm_struct *mm, unsigned long addr,
-	void *user_addr);
+int copy_pte_to_user(pte_t *pte, struct mm_struct *mm, unsigned long address,
+	void *start_addr, pid_t pid)
+{
+	unsigned long mapped_to_addr, phys;
+	struct vm_area_struct *vma;
+
+	mapped_to_addr = (address >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
+	mapped_to_addr += ((unsigned long)start_addr);
+
+	vma = find_vma(mm, mapped_to_addr);
+
+	phys = virt_to_phys(pte) >> PAGE_SHIFT;
+
+	if (mapped_to_addr > vma->vm_end) {
+		pte_unmap(pte);
+		return -EINVAL;
+	}
+
+	if (remap_pfn_range(vma, mapped_to_addr, phys,
+			PAGE_SIZE, vma->vm_page_prot)) {
+		pte_unmap(pte);
+		return -EAGAIN;
+	}
+
+	pte_unmap(pte);
+
+	return 0;
+}
 
 static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct vm_area_struct *user_vma, void *user_addr)
@@ -38,7 +64,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		pte = pte_offset_map(pmd, addr);
 
-		ret = copy_pte_to_user(pte, mm, addr, user_addr);
+		ret = copy_pte_to_user(pte, mm, addr, user_addr, curr->pid);
 		if (ret < 0)
 			return ret;
 	} while (pgd++, addr = next, addr != end);
