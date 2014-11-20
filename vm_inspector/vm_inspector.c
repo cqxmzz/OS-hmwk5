@@ -20,8 +20,9 @@ static int pgnum2index(int num)
 #define file_bit(pte)   ((pte & (1<<2))  >> 2)
 #define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
 #define rdonly_bit(pte) ((pte & (1<<7))  >> 7)
-/* http://infocenter.arm.com/help/index.jsp?
-topic=/com.arm.doc.ddi0360f/BGEIHGIF.html */
+/* citation
+ http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/BGEIHGIF.html
+*/
 #define xn_bit(pte)   (pte & 1)
 #define phys(pte)   (pte >> 12)
 
