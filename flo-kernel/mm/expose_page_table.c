@@ -63,11 +63,20 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		pte = pte_offset_map(pmd, addr);
 
+		if (pte == NULL)
+			continue;
 		ret = copy_pte_to_user(pte, current, addr, user_addr);
 		if (ret < 0)
 			return ret;
-		page = vm_normal_page(vma, addr, pte);
-		page->_count++;
+		
+		if (pte_none(*pte)) {
+			continue;
+		}
+		page = vm_normal_page(vma, addr, *pte);
+		if (!page)
+			continue;
+		printk("1");
+		atomic_inc(&page->_count);
 	} while (pgd++, addr = next, addr != end);
 	return 0;
 }
