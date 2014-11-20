@@ -1,14 +1,8 @@
-#include <linux/cred.h>
-#include <linux/unistd.h>
+#include <linux/kernel.h>
 #include <linux/sched.h>
-#include <linux/types.h>
-#include <linux/threads.h>
 #include <linux/syscalls.h>
-#include <linux/init_task.h>
-#include <linux/list.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
-#include <asm/io.h>
 
 /* Map a target process's page table into address space of the current process.
  *
