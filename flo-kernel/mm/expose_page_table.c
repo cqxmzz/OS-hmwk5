@@ -33,6 +33,11 @@ int copy_pte_to_user(pte_t *pte, struct task_struct *task, unsigned long address
 	return 0;
 }
 
+static int copy_pgd(void *pgd_addr, void *pte_addr)
+{
+	
+}
+
 static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct vm_area_struct *user_vma, void *user_addr)
 {
@@ -75,19 +80,16 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 		page = vm_normal_page(vma, addr, *pte);
 		if (!page)
 			continue;
-		printk("1");
 		atomic_inc(&page->_count);
 	} while (pgd++, addr = next, addr != end);
 	return 0;
 }
 
 static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
-	unsigned long address)
+	unsigned long address, unsigned long size)
 {
 	struct list_head *pglist;
 	struct vm_area_struct *vma, *cur_vma;
-	unsigned long page_table_size =
-			PAGE_SIZE * PTRS_PER_PGD * PTRS_PER_PUD * PTRS_PER_PMD;
 	struct expose_pg_addrs *epga;
 	struct task_struct *p;
 	struct task_struct *task;
@@ -98,7 +100,7 @@ static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
 	if (vma == NULL)
 		return NULL;
 	/* Check the size is large enough */
-	if ((vma->vm_end - address) < page_table_size)
+	if ((vma->vm_end - address) < size)
 		return NULL;
 
 	/* Check address does not belong to another address' vma*/
@@ -106,7 +108,8 @@ static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
 	list_for_each(pos, &p->tasks) {
 		task = list_entry(pos, struct task_struct, tasks);
 		taskmm = task->mm;
-		if (taskmm && taskmm->pg_addrs && taskmm->pg_addrs->task->pid == current->pid) {
+		if (taskmm && taskmm->pg_addrs
+			&& taskmm->pg_addrs->task->pid == current->pid) {
 			list_for_each(pglist, &taskmm->pg_addrs->list) {
 				epga = list_entry(pglist,
 					struct expose_pg_addrs, list);
@@ -146,7 +149,10 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	struct expose_pg_addrs *pg_addrs;
 	struct task_struct *task;
 	int ret;
-	
+	unsigned long page_table_size =
+			PAGE_SIZE * PTRS_PER_PGD * PTRS_PER_PUD * PTRS_PER_PMD;
+	unsigned long pgd_size = PAGE_SIZE * PTRS_PER_PGD;
+
 	/* self */
 	if (pid == -1) {
 		task = current;
@@ -172,7 +178,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	down_read(&(mm->mmap_sem));
 
 	/* check user address valid */
-	user_vma = check_user_vma_is_valid(current->mm, address);
+	user_vma = check_user_vma_is_valid(current->mm, address,
+		page_table_size);
 	if (!user_vma) {
 		kfree(pg_addrs);
 		up_read(&(mm->mmap_sem));
@@ -205,6 +212,20 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		}
 		curr_vma = curr_vma->vm_next;
 	} while (curr_vma);
+
+	/* PGD now */
+	user_vma = check_user_vma_is_valid(current->mm, fake_pgd,
+		pgd_size);
+	if (!user_vma) {
+		up_read(&(mm->mmap_sem));
+		return -EINVAL;
+	}
+
+	ret = copy_pgd((void*)fake_pgd, (void*)address);
+	if (ret < 0){
+		up_read(&(mm->mmap_sem));
+		return ret;
+	}
 
 	/* unlock */
 	up_read(&(mm->mmap_sem));

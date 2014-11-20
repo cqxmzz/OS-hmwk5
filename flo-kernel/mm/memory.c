@@ -573,9 +573,6 @@ void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *vma,
 int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 		pmd_t *pmd, unsigned long address)
 {
-	pte_t *pte;
-	struct expose_pg_addrs *epga;
-	struct list_head *pglist;
 	pgtable_t new = pte_alloc_one(mm, address);
 	int wait_split_huge_page;
 	if (!new)
@@ -602,24 +599,6 @@ int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 		mm->nr_ptes++;
 		pmd_populate(mm, pmd, new);
 		new = NULL;
-
-		/* since the pte is mapped, we copy it*/
-		/* Qiming Chen */
-		/*
-		printk("mycode\n");
-		if (unlikely(mm->pg_addrs)) {
-			pte = pte_offset_map(pmd, address);
-			pglist = mm->pg_addrs->list.next;
-			do {
-				printk("inwhile\n");
-				epga = list_entry(pglist,
-					struct expose_pg_addrs, list);
-				copy_pte_to_user(pte, epga->task, address,
-					epga->address);
-				pglist = pglist->next;
-			} while (pglist != &mm->pg_addrs->list);
-		}
-		*/
 	} else if (unlikely(pmd_trans_splitting(*pmd)))
 		wait_split_huge_page = 1;
 	spin_unlock(&mm->page_table_lock);
@@ -2221,7 +2200,7 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
 		return -ENOMEM;
 	arch_enter_lazy_mmu_mode();
 	do {
-		//BUG_ON(!pte_none(*pte));
+		BUG_ON(!pte_none(*pte));
 		set_pte_at(mm, addr, pte, pte_mkspecial(pfn_pte(pfn, prot)));
 		pfn++;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
