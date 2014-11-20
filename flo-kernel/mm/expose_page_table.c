@@ -162,6 +162,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	/* lock */
 	down_read(&(mm->mmap_sem));
 
+	kprintf("check_user_vma_is_valid");
 	/* check user address valid */
 	user_vma = check_user_vma_is_valid(current->mm, address);
 	if (!user_vma) {
@@ -182,6 +183,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 
 	/* go through the list of VMAs and copy the PTEs */
 	do {
+		kprintf("copy_ptes");
 		ret = copy_ptes(mm, curr_vma, user_vma, (void*)address);
 		if (ret < 0){
 			/*
