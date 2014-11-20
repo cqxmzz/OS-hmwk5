@@ -290,7 +290,16 @@ struct mm_rss_stat {
 	atomic_long_t count[NR_MM_COUNTERS];
 };
 
+/* records of mapping of memory */
+/* Qiming Chen */
+struct expose_pg_addrs {
+	void *address;
+	pid_t pid;
+	struct list_head list;
+};
+
 struct mm_struct {
+	struct expose_pg_addrs *pg_addrs;	/* Qiming Chen */
 	struct vm_area_struct * mmap;		/* list of VMAs */
 	struct rb_root mm_rb;
 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
