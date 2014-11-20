@@ -59,10 +59,6 @@ int main(int argc, char **argv)
 	page_table = expose(pid);
 
 	if (page_table == NULL) {
-		if (verbose) {
-			printf("0x400 0x10000000 0 0 0 0 0 0\n");
-			return 0;
-		}
 		return -1;
 	}
 
@@ -71,8 +67,11 @@ int main(int argc, char **argv)
 
 		if (page == NULL)
 			continue;
-		if (*page == 0)
+		if (*page == 0) {
+			if (verbose)
+				printf("0x400 0x10000000 0 0 0 0 0 0\n");
 			continue;
+		}
 		printf("%d ", i);
 		printf("%p ", page);
 		printf("%p ", (void *)phys(*page));
@@ -83,10 +82,11 @@ int main(int argc, char **argv)
 		printf("%lu ", user_bit(*page));
 		printf("\n");
 	}
-	
-	free(page_table);
-	free(page);
-	page_table = NULL;
-	page = NULL;
-	return 0;
+	munmap(page_table, PAGE_TABLE_SIZE * 2);
+        //free(page_table);
+        //free(page);
+        page_table = NULL;
+        page = NULL;
+        return 0;
 }
+
