@@ -12,7 +12,7 @@ int copy_pte_to_user(pte_t *pte, struct task_struct *task, unsigned long address
 
 	unsigned long mapped_to_addr, phys;
 	struct vm_area_struct *vma;
-	struct mm_struct mm = task->mm;
+	struct mm_struct *mm = task->mm;
 
 	mapped_to_addr = (address >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
 	mapped_to_addr += ((unsigned long)start_addr);
@@ -70,6 +70,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 		if (ret < 0)
 			return ret;
 	} while (pgd++, addr = next, addr != end);
+	return 0;
 }
 
 static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
@@ -97,7 +98,7 @@ static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
 	list_for_each(pos, &p->tasks) {
 		task = list_entry(pos, struct task_struct, tasks);
 		taskmm = task->mm;
-		if (taskmm->pg_addrs && taskmm->pg_addrs->pid == current->pid) {
+		if (taskmm->pg_addrs && taskmm->pg_addrs->task->pid == current->pid) {
 			list_for_each(pglist, &taskmm->pg_addrs->list) {
 				epga = list_entry(pglist,
 					struct expose_pg_addrs, list);
@@ -157,12 +158,12 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		return -EFAULT;
 
 	INIT_LIST_HEAD(&pg_addrs->list);
-	pg_addrs->pid = pid;
+	pg_addrs->task = task;
 
 	/* lock */
 	down_read(&(mm->mmap_sem));
 
-	kprintf("check_user_vma_is_valid");
+	printk("check_user_vma_is_valid");
 	/* check user address valid */
 	user_vma = check_user_vma_is_valid(current->mm, address);
 	if (!user_vma) {
@@ -183,7 +184,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 
 	/* go through the list of VMAs and copy the PTEs */
 	do {
-		kprintf("copy_ptes");
+		printk("copy_ptes");
 		ret = copy_ptes(mm, curr_vma, user_vma, (void*)address);
 		if (ret < 0){
 			/*
