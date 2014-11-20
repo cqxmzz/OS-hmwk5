@@ -99,7 +99,6 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
 	unsigned long address, unsigned long size)
 {
-	printk("in checking\n");
 	struct list_head *pglist;
 	struct vm_area_struct *vma, *cur_vma;
 	struct expose_pg_addrs *epga;
@@ -164,7 +163,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	int ret;
 	unsigned long page_table_size =
 			PAGE_SIZE * PTRS_PER_PGD * PTRS_PER_PUD * PTRS_PER_PMD;
-	unsigned long pgd_size = PAGE_SIZE * PTRS_PER_PGD;
+	unsigned long pgd_size = PTRS_PER_PGD * sizeof(unsigned long);
 
 	/* self */
 	if (pid == -1) {
@@ -193,23 +192,22 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	/* check user address valid */
 	user_vma = check_user_vma_is_valid(current->mm, address,
 		page_table_size);
-	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
 	if (!user_vma) {
 		kfree(pg_addrs);
 		up_read(&(mm->mmap_sem));
 		return -EINVAL;
 	}
+	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
 
 	/* PGD */
 	pgd_user_vma = check_user_vma_is_valid(current->mm, fake_pgd,
 		pgd_size);
-	pgd_user_vma->vm_flags = pgd_user_vma->vm_flags & ~VM_SHARED;
 	if (!pgd_user_vma) {
 		kfree(pg_addrs);
 		up_read(&(mm->mmap_sem));
 		return -EINVAL;
 	}
-	printk("done all checking\n");
+	pgd_user_vma->vm_flags = pgd_user_vma->vm_flags & ~VM_SHARED;
 	pg_addrs->address = (void*)address;
 
 	/* add the new pg_addrs to the list */
