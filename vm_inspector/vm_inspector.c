@@ -32,16 +32,16 @@ static unsigned long * expose(int pid)
 				 MAP_SHARED, fd, 0);
 	close(fd);
 	if (addr == MAP_FAILED) {
-		printf("Error: mmap");
+		printf("Error: mmap\n");
 		return NULL;
 	}
 	if (pgd_addr == MAP_FAILED) {
-		printf("Error: mmap");
+		printf("Error: mmap\n");
 		return NULL;
 	}
 	if (syscall(378, pid, (unsigned long)pgd_addr,
 			(unsigned long)addr) < 0) {
-		printf("Error: expose_page_table syscall");
+		printf("Error: expose_page_table syscall\n");
 		return NULL;
 	}
 	printf("%p ", addr);
@@ -99,4 +99,3 @@ int main(int argc, char **argv)
         page = NULL;
         return 0;
 }
-
