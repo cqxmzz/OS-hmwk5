@@ -44,6 +44,8 @@ static unsigned long * expose(int pid)
 		printf("Error: expose_page_table syscall");
 		return NULL;
 	}
+	printf("%p ", addr);
+	printf("%p ", pgd_addr[1]);
 	return addr;
 }
 
@@ -79,7 +81,7 @@ int main(int argc, char **argv)
 				printf("0x400 0x10000000 0 0 0 0 0 0\n");
 			continue;
 		}
-		printf("%d ", i);
+		printf("%x ", i);
 		printf("%p ", page);
 		printf("%p ", (void *)phys(*page));
 		printf("%lu ", young_bit(*page));
@@ -90,6 +92,7 @@ int main(int argc, char **argv)
 		printf("\n");
 	}
 	munmap(page_table, PAGE_TABLE_SIZE * 2);
+	//munmap(page_table, PGD_SIZE * 2);
         //free(page_table);
         //free(page);
         page_table = NULL;
