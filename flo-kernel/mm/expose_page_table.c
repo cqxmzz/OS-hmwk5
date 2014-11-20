@@ -99,6 +99,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
 	unsigned long address, unsigned long size)
 {
+	printk("in checking\n");
 	struct list_head *pglist;
 	struct vm_area_struct *vma, *cur_vma;
 	struct expose_pg_addrs *epga;
@@ -208,7 +209,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		up_read(&(mm->mmap_sem));
 		return -EINVAL;
 	}
-
+	printk("done all checking\n");
 	pg_addrs->address = (void*)address;
 
 	/* add the new pg_addrs to the list */
