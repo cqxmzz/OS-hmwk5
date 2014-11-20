@@ -9,11 +9,10 @@
 int copy_pte_to_user(pte_t *pte, struct task_struct *task,
 	unsigned long address, void *start_addr)
 {
-
 	unsigned long mapped_to_addr, phys;
 	struct vm_area_struct *vma;
 	struct mm_struct *mm = task->mm;
-
+	printk("%ul", (unsigned long)*pte);
 	mapped_to_addr = (address >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
 	mapped_to_addr += ((unsigned long)start_addr);
 

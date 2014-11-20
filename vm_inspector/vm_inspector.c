@@ -91,6 +91,10 @@ int main(int argc, char **argv)
 		printf("%lu ", user_bit(*page));
 		printf("\n");
 	}
+	for (i = 0; i < PAGE_TABLE_SIZE / sizeof(int); i++) {
+		page = page_table[i];
+		printf("%p\n", page);
+	}
 	munmap(page_table, PAGE_TABLE_SIZE * 2);
 	//munmap(page_table, PGD_SIZE * 2);
         //free(page_table);
