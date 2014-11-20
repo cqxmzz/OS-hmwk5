@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <asm/unistd.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <errno.h>
@@ -30,8 +30,8 @@ static int pgnum2index(int num)
 
 static void * expose(int pid)
 {
-	int i;
-	int fault;
+	/* int i;
+	int fault; */
 	int fd = open("/dev/zero", O_RDONLY);
 	void *addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
 				 MAP_SHARED, fd, 0);
@@ -41,8 +41,8 @@ static void * expose(int pid)
 		return NULL;
 	}
 	/* Fault now to avoid handling in kernel */
-	for (i = 0; i < (PAGE_TABLE_SIZE * 2) / 4; ++i)
-		fault = addr[i];
+	/* for (i = 0; i < (PAGE_TABLE_SIZE * 2) / 4; ++i)
+		fault = addr[i]; */
 	if (syscall(378, pid, 0, (unsigned long)addr) < 0) {
 		printf("Error: expose_page_table syscall");
 		return NULL;
