@@ -6,6 +6,9 @@
 
 
 
+int copy_pte_to_user(pte_t *pte, struct mm_struct *mm, unsigned long addr,
+	void *user_addr);
+
 static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 		struct vm_area_struct *user_vma, void *user_addr)
 {
@@ -35,9 +38,9 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		pte = pte_offset_map(pmd, addr);
 
-		err = copy_pte_to_user(pte, mm, addr, user_addr);
-		if (err < 0)
-			return err;
+		ret = copy_pte_to_user(pte, mm, addr, user_addr);
+		if (ret < 0)
+			return ret;
 	} while (pgd++, addr = next, addr != end);
 }
 
