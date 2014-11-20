@@ -28,5 +28,14 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 				unsigned long __user, fake_pgd,
 				unsigned long __user, addr)
 {
+	struct mm_struct *mm;
+	if (pid == -1)
+		pid = current->pid;
+	mm = current->mm;
+	/* If this task_struct is a thread, just return.
+	 * Wendan Kang
+	 */
+	if (mm == NULL)
+		return -EINVAL;
 	return 0;
 }
