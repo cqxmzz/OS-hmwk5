@@ -37,6 +37,7 @@ static int copy_pgd_to_user(unsigned long addr, void *pte_addr, void *pgd_addr)
 {
 	unsigned long mapped_addr;
 	unsigned long write_addr;
+	int ret;
 
 	mapped_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
 	mapped_addr += ((unsigned long)pte_addr);
@@ -44,7 +45,11 @@ static int copy_pgd_to_user(unsigned long addr, void *pte_addr, void *pgd_addr)
 	write_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE * 4;
 	write_addr += ((unsigned long)pgd_addr);
 	
-	copy_to_user((void *)write_addr, &mapped_addr, sizeof(unsigned long));
+	ret = copy_to_user((void *)write_addr, &mapped_addr,
+		sizeof(unsigned long));
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -232,14 +237,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		}
 		curr_vma = curr_vma->vm_next;
 	} while (curr_vma);
-
-	
-
-	ret = copy_pgd((void*)fake_pgd, (void*)address);
-	if (ret < 0){
-		up_read(&(mm->mmap_sem));
-		return ret;
-	}
 
 	/* unlock */
 	up_read(&(mm->mmap_sem));
