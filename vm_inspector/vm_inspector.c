@@ -47,14 +47,14 @@ int main(int argc, char **argv)
 	int pid;
 	int verbose = 0;
 
-	if(argc != 2)
+	if(argc != 3 && argc != 2)
 		return -1;
 
-	if(argv[0][0] == '-' && argv[0][1] == 'v')
+	if(argv[1][0] == '-' && argv[1][1] == 'v')
 		verbose = 1;
 
 	/* second argument is pid*/
-	pid = atoi(argv[1]);
+	pid = atoi(argv[argc-1]);
 
 	page_table = expose(pid);
 
