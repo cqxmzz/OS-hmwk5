@@ -105,7 +105,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		up_read(&(mm->mmap_sem));
 		return -EINVAL;
 	}
-	pg_addrs->address = address;
+	pg_addrs->address = (void*)address;
 
 	/* add the new pg_addrs to the list */
 	if (mm->pg_addrs)
