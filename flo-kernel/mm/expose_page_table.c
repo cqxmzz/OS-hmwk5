@@ -8,7 +8,45 @@
 
 
 
+static struct vm_area_struct *
+check_user_vma_is_valid(struct mm_struct *mm, unsigned long address)
+{
+	struct list_head *pglist;
+	struct vm_area_struct *vma, *cur_vma;
+	unsigned long page_table_size =
+			PAGE_SIZE * PTRS_PER_PGD * PTRS_PER_PUD * PTRS_PER_PMD;
+	struct expose_pg_addrs *epga;
+	struct task_struct *p;
+	struct task_struct *task;
+	struct list_head *pos;
+	struct mm_struct *taskmm;
 
+	vma = find_vma(mm, address);
+	if (vma == NULL)
+		return NULL;
+	/* Check the size is large enough */
+	if ((vma->vm_end - address) < page_table_size)
+		return NULL;
+
+	/* Check address does not belong to another address' vma*/
+	p=&init_task;
+	list_for_each(pos, &p->tasks) {
+		task = list_entry(pos, struct task_struct, tasks);
+		taskmm = task->mm;
+		if (taskmm->pg_addrs && taskmm->pg_addrs->pid == current->pid) {
+			list_for_each(pglist, &taskmm->pg_addrs->list) {
+				epga = list_entry(pglist,
+					struct expose_pg_addrs, list);
+				cur_vma = find_vma(taskmm,
+					(unsigned long)epga->address);
+				if (vma == cur_vma)
+					return NULL;
+			}
+		}
+	}
+
+	return vma;
+}
 
 /* Map a target process's page table into address space of the current process.
  *
@@ -64,7 +102,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	down_read(&(mm->mmap_sem));
 
 	/* check user address valid */
-	user_vma = check_user_vma_is_valid(mm, (unsigned long)address);
+	user_vma = check_user_vma_is_valid(current->mm, (unsigned long)address);
 	if (!user_vma) {
 		kfree(pg_addrs);
 		up_read(&(mm->mmap_sem));
