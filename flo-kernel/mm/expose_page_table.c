@@ -18,20 +18,22 @@ int copy_pte_to_user(pte_t *pte, struct task_struct *task, unsigned long address
 	mapped_to_addr += ((unsigned long)start_addr);
 
 	vma = find_vma(mm, mapped_to_addr);
-
+	printk("before phys\n");
 	phys = virt_to_phys(pte) >> PAGE_SHIFT;
-
+	printk("after phys\n");
 	if (mapped_to_addr > vma->vm_end) {
+		printk("return 1\n");
 		pte_unmap(pte);
 		return -EINVAL;
 	}
-
+	printk("pfn\n");
 	if (remap_pfn_range(vma, mapped_to_addr, phys,
 			PAGE_SIZE, vma->vm_page_prot)) {
+		printk("return 2\n");
 		pte_unmap(pte);
 		return -EAGAIN;
 	}
-
+	printk("after pfn\n");
 	pte_unmap(pte);
 
 	return 0;
@@ -52,6 +54,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 	pgd = pgd_offset(mm, addr);
 
 	do {
+		printk("in while\n");
 		next = pgd_addr_end(addr, end);
 		if (pgd_none_or_clear_bad(pgd))
 			continue;

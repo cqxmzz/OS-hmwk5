@@ -605,19 +605,21 @@ int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		/* since the pte is mapped, we copy it*/
 		/* Qiming Chen */
+		/*
+		printk("mycode\n");
 		if (unlikely(mm->pg_addrs)) {
 			pte = pte_offset_map(pmd, address);
-			pglist = &mm->pg_addrs->list;
+			pglist = mm->pg_addrs->list.next;
 			do {
+				printk("inwhile\n");
 				epga = list_entry(pglist,
 					struct expose_pg_addrs, list);
 				copy_pte_to_user(pte, epga->task, address,
 					epga->address);
-				pglist = mm->pg_addrs->list.next;
+				pglist = pglist->next;
 			} while (pglist != &mm->pg_addrs->list);
 		}
-
-
+		*/
 	} else if (unlikely(pmd_trans_splitting(*pmd)))
 		wait_split_huge_page = 1;
 	spin_unlock(&mm->page_table_lock);
