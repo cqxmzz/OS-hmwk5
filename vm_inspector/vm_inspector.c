@@ -16,10 +16,10 @@ static int pgnum2index(int num)
 }
 
 #define young_bit(pte)  ((pte & (1<<1))  >> 1)
-#define file_bit(pte)   ((pte & (1<<2))   >> 2)
+#define file_bit(pte)   ((pte & (1<<2))  >> 2)
 #define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
-#define rdonly_bit(pte) ((pte & (1<<7)) >> 7)
-#define user_bit(pte)   ((pte & (1<<8))   >> 8)
+#define rdonly_bit(pte) ((pte & (1<<7))  >> 7)
+#define user_bit(pte)   ((pte & (1<<8))  >> 8)
 #define phys(pte)   (pte >> 12)
 
 static unsigned long * expose(int pid)
