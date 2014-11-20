@@ -35,7 +35,7 @@ int copy_pte_to_user(pte_t *pte, struct task_struct *task, unsigned long address
 
 static int copy_pgd(void *pgd_addr, void *pte_addr)
 {
-	
+
 }
 
 static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
@@ -180,6 +180,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	/* check user address valid */
 	user_vma = check_user_vma_is_valid(current->mm, address,
 		page_table_size);
+	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
 	if (!user_vma) {
 		kfree(pg_addrs);
 		up_read(&(mm->mmap_sem));
@@ -216,6 +217,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	/* PGD now */
 	user_vma = check_user_vma_is_valid(current->mm, fake_pgd,
 		pgd_size);
+	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
 	if (!user_vma) {
 		up_read(&(mm->mmap_sem));
 		return -EINVAL;
