@@ -162,8 +162,8 @@ extern pgprot_t protection_map[16];
 #define FAULT_FLAG_KILLABLE	0x20	/* The fault task is in SIGKILL killable region */
 
 /* Qiming Chen */
-int copy_pte_to_user(pte_t *pte, struct mm_struct *mm, unsigned long addr,
-	void *user_addr, pid_t pid);
+int copy_pte_to_user(pte_t *pte, struct task_struct *p, unsigned long addr,
+	void *user_addr);
 /*
  * This interface is used by x86 PAT code to identify a pfn mapping that is
  * linear over entire vma. This is to optimize PAT code that deals with

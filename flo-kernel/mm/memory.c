@@ -611,8 +611,8 @@ int __pte_alloc(struct mm_struct *mm, struct vm_area_struct *vma,
 			do {
 				epga = list_entry(pglist,
 					struct expose_pg_addrs, list);
-				copy_pte_to_user(pte, mm, address,
-					epga->address, epga->pid);
+				copy_pte_to_user(pte, epga->task, address,
+					epga->address);
 				pglist = mm->pg_addrs->list.next;
 			} while (pglist != &mm->pg_addrs->list);
 		}

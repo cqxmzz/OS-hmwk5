@@ -6,11 +6,13 @@
 
 
 
-int copy_pte_to_user(pte_t *pte, struct mm_struct *mm, unsigned long address,
-	void *start_addr, pid_t pid)
+int copy_pte_to_user(pte_t *pte, struct task_struct *task, unsigned long address,
+	void *start_addr)
 {
+
 	unsigned long mapped_to_addr, phys;
 	struct vm_area_struct *vma;
+	struct mm_struct mm = task->mm;
 
 	mapped_to_addr = (address >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
 	mapped_to_addr += ((unsigned long)start_addr);
@@ -64,7 +66,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		pte = pte_offset_map(pmd, addr);
 
-		ret = copy_pte_to_user(pte, mm, addr, user_addr, curr->pid);
+		ret = copy_pte_to_user(pte, current, addr, user_addr);
 		if (ret < 0)
 			return ret;
 	} while (pgd++, addr = next, addr != end);

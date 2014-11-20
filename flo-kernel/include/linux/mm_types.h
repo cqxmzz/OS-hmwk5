@@ -294,7 +294,7 @@ struct mm_rss_stat {
 /* Qiming Chen */
 struct expose_pg_addrs {
 	void *address;
-	pid_t pid;
+	struct task_struct *task;
 	struct list_head list;
 };
 
