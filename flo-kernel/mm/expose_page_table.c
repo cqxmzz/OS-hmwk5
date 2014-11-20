@@ -18,22 +18,16 @@ int copy_pte_to_user(pte_t *pte, struct task_struct *task, unsigned long address
 	mapped_to_addr += ((unsigned long)start_addr);
 
 	vma = find_vma(mm, mapped_to_addr);
-	printk("before phys\n");
 	phys = virt_to_phys(pte) >> PAGE_SHIFT;
-	printk("after phys\n");
 	if (mapped_to_addr > vma->vm_end) {
-		printk("return 1\n");
 		pte_unmap(pte);
 		return -EINVAL;
 	}
-	printk("pfn\n");
 	if (remap_pfn_range(vma, mapped_to_addr, phys,
 			PAGE_SIZE, vma->vm_page_prot)) {
-		printk("return 2\n");
 		pte_unmap(pte);
 		return -EAGAIN;
 	}
-	printk("after pfn\n");
 	pte_unmap(pte);
 
 	return 0;
@@ -46,6 +40,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
+	struct page * page;
 	int ret;
 	unsigned long next;
 	unsigned long addr = vma->vm_start;
@@ -54,7 +49,6 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 	pgd = pgd_offset(mm, addr);
 
 	do {
-		printk("in while\n");
 		next = pgd_addr_end(addr, end);
 		if (pgd_none_or_clear_bad(pgd))
 			continue;
@@ -72,6 +66,8 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 		ret = copy_pte_to_user(pte, current, addr, user_addr);
 		if (ret < 0)
 			return ret;
+		page = vm_normal_page(vma, addr, pte);
+		page->_count++;
 	} while (pgd++, addr = next, addr != end);
 	return 0;
 }
@@ -166,10 +162,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	/* lock */
 	down_read(&(mm->mmap_sem));
 
-	printk("check_user_vma_is_valid");
 	/* check user address valid */
 	user_vma = check_user_vma_is_valid(current->mm, address);
-	printk("check_user_vma_is_valid_done");
 	if (!user_vma) {
 		kfree(pg_addrs);
 		up_read(&(mm->mmap_sem));
@@ -188,7 +182,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 
 	/* go through the list of VMAs and copy the PTEs */
 	do {
-		printk("copy_ptes");
 		ret = copy_ptes(mm, curr_vma, user_vma, (void*)address);
 		if (ret < 0){
 			/*
