@@ -1,0 +1,7 @@
+They share objects like:
+
+
+java.lang.Object
+android.content.Context
+android.content.ContextWrapper
+android.app.Service
