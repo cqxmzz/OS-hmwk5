@@ -39,11 +39,11 @@ static int copy_pgd_to_user(unsigned long addr, void *pte_addr, void *pgd_addr)
 
 	mapped_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
 	mapped_addr += ((unsigned long)pte_addr);
-	
+
 	write_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE * 4;
 	write_addr += ((unsigned long)pgd_addr);
-	
-	ret = copy_to_user((void *)write_addr, mapped_addr,
+
+	ret = copy_to_user((void *)write_addr, &mapped_addr,
 		sizeof(unsigned long));
 	if (ret < 0)
 		return ret;
@@ -57,7 +57,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
-	struct page * page;
+	struct page *page;
 	int ret;
 	unsigned long next;
 	unsigned long addr = vma->vm_start;
@@ -94,7 +94,7 @@ static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
 	return 0;
 }
 
-static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
+static struct vm_area_struct *check_user_vma_is_valid(struct mm_struct *mm,
 	unsigned long address, unsigned long size)
 {
 	struct list_head *pglist;
@@ -113,7 +113,7 @@ static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
 		return NULL;
 
 	/* Check address does not belong to another address' vma*/
-	p=&init_task;
+	p = &init_task;
 	list_for_each(pos, &p->tasks) {
 		task = list_entry(pos, struct task_struct, tasks);
 		taskmm = task->mm;
@@ -167,8 +167,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	if (pid == -1) {
 		task = current;
 		mm = current->mm;
-	}
-	else {
+	} else {
 		task = find_task_by_vpid(pid);
 		if (!task)
 			return -EINVAL;
@@ -177,7 +176,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	/* check mm exist */
 	if (!mm)
 		return -EINVAL;
-	printk("got mm\n");
 	pg_addrs = kmalloc(sizeof(struct expose_pg_addrs), GFP_KERNEL);
 	if (!pg_addrs)
 		return -EFAULT;
@@ -197,7 +195,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		return -EINVAL;
 	}
 	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
-	printk("checked add\n");
+
 	/* PGD */
 	pgd_user_vma = check_user_vma_is_valid(current->mm, fake_pgd,
 		pgd_size);
@@ -207,8 +205,8 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		return -EINVAL;
 	}
 	pgd_user_vma->vm_flags = pgd_user_vma->vm_flags & ~VM_SHARED;
-	pg_addrs->address = (void*)address;
-	printk("checked pgd\n");
+	pg_addrs->address = (void *)address;
+
 	/* add the new pg_addrs to the list */
 	if (mm->pg_addrs)
 		list_add(&(pg_addrs->list), &(mm->pg_addrs->list));
@@ -220,10 +218,9 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 
 	/* go through the list of VMAs and copy the PTEs */
 	do {
-		printk("copy\n");
 		ret = copy_ptes(mm, curr_vma, user_vma, (void *)address,
 			(void *)fake_pgd);
-		if (ret < 0){
+		if (ret < 0) {
 			/*
 			if (mm->pg_addrs == pg_addrs)
 				mm->pg_addrs == NULL;

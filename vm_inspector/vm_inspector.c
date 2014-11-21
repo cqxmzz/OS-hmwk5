@@ -3,25 +3,25 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
-#include <errno.h>
 #include <string.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
+#include <errno.h>
 
 #define PAGE_TABLE_SIZE (4*1024*1024) /* 4mb */
 #define PGD_SIZE (2048*4)
 
 static int pgnum2index(int num)
 {
-	return (((num / 512 * 4096) / 4) + (num % 512));
+	return ((num / 512 * 4096) / 4) + (num % 512);
 }
-
 #define young_bit(pte)  ((pte & (1<<1))  >> 1)
 #define file_bit(pte)   ((pte & (1<<2))  >> 2)
 #define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
 #define rdonly_bit(pte) ((pte & (1<<7))  >> 7)
 /* citation
- http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/BGEIHGIF.html
+ * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/
+ * BGEIHGIF.html
 */
 #define xn_bit(pte)   ((pte & (1<<9))  >> 9)
 #define phys(pte)   (pte >> 12)
@@ -31,13 +31,20 @@ static int expose(int pid, void *pgd_addr, void *addr)
 	if (syscall(378, pid, (unsigned long)pgd_addr,
 			(unsigned long)addr) < 0) {
 		printf("Error: expose_page_table syscall\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (pgd_addr == NULL)
-		return -1;
+		return -EINVAL;
 	if (addr == NULL)
-		return -1;
-
+		return -EINVAL;
+	/*
+	 * printf("***********%p ", addr);
+	 * int i = 0;
+	 * for ( i = 0; i < PGD_SIZE * 2; i++) {
+	 *	if (((unsigned long*)pgd_addr)[i] != 0)
+	 *		printf("***********%d\n", i);
+	 *}
+	 */
 	return 0;
 }
 
@@ -49,10 +56,10 @@ int main(int argc, char **argv)
 	int pid;
 	int verbose = 0;
 
-	if(argc != 3 && argc != 2)
-		return -1;
+	if (argc != 3 && argc != 2)
+		return -EINVAL;
 
-	if(argv[1][0] == '-' && argv[1][1] == 'v')
+	if (argv[1][0] == '-' && argv[1][1] == 'v')
 		verbose = 1;
 
 	/* last argument is pid*/
@@ -61,21 +68,20 @@ int main(int argc, char **argv)
 	int fd = open("/dev/zero", O_RDONLY);
 	unsigned long *pte_addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
 				MAP_SHARED, fd, 0);
-	unsigned long *pgd_addr = mmap(NULL, PGD_SIZE * 2, PROT_READ,
-				MAP_SHARED, fd, 0);
+	unsigned long *pgd_addr = malloc(PGD_SIZE * 2 * sizeof(unsigned long));
 	close(fd);
 
 	if (pte_addr == MAP_FAILED) {
 		printf("Error: mmap\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (pgd_addr == MAP_FAILED) {
 		printf("Error: mmap\n");
-		return -1;
+		return -EINVAL;
 	}
 
-	if(expose(pid, pgd_addr, pte_addr) < 0)
-		return -1;
+	if (expose(pid, pgd_addr, pte_addr) < 0)
+		return -EINVAL;
 
 	/* iterate all entries of ptes */
 	for (i = 0; i < PAGE_TABLE_SIZE / sizeof(int); i++) {
@@ -102,9 +108,8 @@ int main(int argc, char **argv)
 
 	munmap(pte_addr, PAGE_TABLE_SIZE * 2);
 	munmap(pgd_addr, PGD_SIZE * 2);
-
-        pgd_addr = NULL;
+	pgd_addr = NULL;
 	pte_addr = NULL;
-        page = NULL;
-        return 0;
+	page = NULL;
+	return 0;
 }
