@@ -1,0 +1,444 @@
+diff --git a/flo-kernel/arch/arm/include/asm/unistd.h b/flo-kernel/arch/arm/include/asm/unistd.h
+index 512cd14..8568517 100644
+--- a/flo-kernel/arch/arm/include/asm/unistd.h
++++ b/flo-kernel/arch/arm/include/asm/unistd.h
+@@ -404,6 +404,7 @@
+ #define __NR_setns			(__NR_SYSCALL_BASE+375)
+ #define __NR_process_vm_readv		(__NR_SYSCALL_BASE+376)
+ #define __NR_process_vm_writev		(__NR_SYSCALL_BASE+377)
++#define __NR_expose_page_table		(__NR_SYSCALL_BASE+378)
+ 
+ /*
+  * The following SWIs are ARM private.
+diff --git a/flo-kernel/arch/arm/kernel/calls.S b/flo-kernel/arch/arm/kernel/calls.S
+index 463ff4a..bb517e6 100644
+--- a/flo-kernel/arch/arm/kernel/calls.S
++++ b/flo-kernel/arch/arm/kernel/calls.S
+@@ -387,6 +387,7 @@
+ /* 375 */	CALL(sys_setns)
+ 		CALL(sys_process_vm_readv)
+ 		CALL(sys_process_vm_writev)
++		CALL(sys_expose_page_table)
+ #ifndef syscalls_counted
+ .equ syscalls_padding, ((NR_syscalls + 3) & ~3) - NR_syscalls
+ #define syscalls_counted
+diff --git a/flo-kernel/include/linux/mm_types.h b/flo-kernel/include/linux/mm_types.h
+index 9035d0a..836f088 100644
+--- a/flo-kernel/include/linux/mm_types.h
++++ b/flo-kernel/include/linux/mm_types.h
+@@ -290,7 +290,16 @@ struct mm_rss_stat {
+ 	atomic_long_t count[NR_MM_COUNTERS];
+ };
+ 
++/* records of mapping of memory */
++/* Qiming Chen */
++struct expose_pg_addrs {
++	void *address;
++	struct task_struct *task;
++	struct list_head list;
++};
++
+ struct mm_struct {
++	struct expose_pg_addrs *pg_addrs;	/* Qiming Chen */
+ 	struct vm_area_struct * mmap;		/* list of VMAs */
+ 	struct rb_root mm_rb;
+ 	struct vm_area_struct * mmap_cache;	/* last find_vma result */
+diff --git a/flo-kernel/include/linux/syscalls.h b/flo-kernel/include/linux/syscalls.h
+index 3de3acb..23e3887 100644
+--- a/flo-kernel/include/linux/syscalls.h
++++ b/flo-kernel/include/linux/syscalls.h
+@@ -857,5 +857,7 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
+ 				      const struct iovec __user *rvec,
+ 				      unsigned long riovcnt,
+ 				      unsigned long flags);
+-
++asmlinkage long sys_expose_page_table(pid_t __user pid,
++					unsigned long __user fake_pgd,
++					unsigned long __user addr);
+ #endif
+diff --git a/flo-kernel/mm/expose_page_table.c b/flo-kernel/mm/expose_page_table.c
+new file mode 100644
+index 0000000..f1295fa
+--- /dev/null
++++ b/flo-kernel/mm/expose_page_table.c
+@@ -0,0 +1,244 @@
++#include <linux/kernel.h>
++#include <linux/sched.h>
++#include <linux/syscalls.h>
++#include <linux/uaccess.h>
++#include <linux/slab.h>
++
++
++
++int copy_pte_to_user(pte_t *pte, struct task_struct *task,
++	unsigned long address, void *start_addr)
++{
++	unsigned long mapped_to_addr, phys;
++	struct vm_area_struct *vma;
++	struct mm_struct *mm = task->mm;
++	mapped_to_addr = (address >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
++	mapped_to_addr += ((unsigned long)start_addr);
++
++	vma = find_vma(mm, mapped_to_addr);
++	phys = virt_to_phys(pte) >> PAGE_SHIFT;
++	if (mapped_to_addr > vma->vm_end) {
++		pte_unmap(pte);
++		return -EINVAL;
++	}
++	if (remap_pfn_range(vma, mapped_to_addr, phys,
++			PAGE_SIZE, vma->vm_page_prot)) {
++		pte_unmap(pte);
++		return -EAGAIN;
++	}
++	pte_unmap(pte);
++
++	return 0;
++}
++
++static int copy_pgd_to_user(unsigned long addr, void *pte_addr, void *pgd_addr)
++{
++	unsigned long mapped_addr;
++	unsigned long write_addr;
++	int ret;
++
++	mapped_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
++	mapped_addr += ((unsigned long)pte_addr);
++	
++	write_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE * 4;
++	write_addr += ((unsigned long)pgd_addr);
++	
++	ret = copy_to_user((void *)write_addr, &mapped_addr,
++		sizeof(unsigned long));
++	if (ret < 0)
++		return ret;
++	return 0;
++}
++
++static int copy_ptes(struct mm_struct *mm, struct vm_area_struct *vma,
++	struct vm_area_struct *user_vma, void *user_addr, void *pgd_addr)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++	pte_t *pte;
++	struct page * page;
++	int ret;
++	unsigned long next;
++	unsigned long addr = vma->vm_start;
++	unsigned long end = vma->vm_end;
++
++	pgd = pgd_offset(mm, addr);
++
++	do {
++		next = pgd_addr_end(addr, end);
++		if (pgd_none_or_clear_bad(pgd))
++			continue;
++
++		pud = pud_offset(pgd, addr);
++		if (pud_none_or_clear_bad(pud))
++			continue;
++
++		pmd = pmd_offset(pud, addr);
++		if (pmd_none_or_clear_bad(pmd))
++			continue;
++
++		pte = pte_offset_map(pmd, addr);
++
++		ret = copy_pte_to_user(pte, current, addr, user_addr);
++		if (ret < 0)
++			return ret;
++		ret = copy_pgd_to_user(addr, user_addr, pgd_addr);
++		if (ret < 0)
++			return ret;
++		page = vm_normal_page(vma, addr, *pte);
++		if (!page)
++			continue;
++		atomic_inc(&page->_count);
++	} while (pgd++, addr = next, addr != end);
++	return 0;
++}
++
++static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
++	unsigned long address, unsigned long size)
++{
++	struct list_head *pglist;
++	struct vm_area_struct *vma, *cur_vma;
++	struct expose_pg_addrs *epga;
++	struct task_struct *p;
++	struct task_struct *task;
++	struct list_head *pos;
++	struct mm_struct *taskmm;
++
++	vma = find_vma(mm, address);
++	if (vma == NULL)
++		return NULL;
++	/* Check the size is large enough */
++	if ((vma->vm_end - address) < size)
++		return NULL;
++
++	/* Check address does not belong to another address' vma*/
++	p=&init_task;
++	list_for_each(pos, &p->tasks) {
++		task = list_entry(pos, struct task_struct, tasks);
++		taskmm = task->mm;
++		if (taskmm && taskmm->pg_addrs
++			&& taskmm->pg_addrs->task->pid == current->pid) {
++			list_for_each(pglist, &taskmm->pg_addrs->list) {
++				epga = list_entry(pglist,
++					struct expose_pg_addrs, list);
++				cur_vma = find_vma(taskmm,
++					(unsigned long)epga->address);
++				if (vma == cur_vma)
++					return NULL;
++			}
++		}
++	}
++
++	return vma;
++}
++
++/* Map a target process's page table into address space of the current process.
++ *
++ * After successfully completing this call, addr will contain the
++ * page tables of the target process. To make it efficient for referencing
++ * the re-mapped page tables in user space, your syscall is asked to build a
++ * fake pgd table. The fake pgd will be indexed by pgd_index(va) (i.e. index
++ * for page directory for a given virtual address va).
++ *
++ * @pid: pid of the target process you want to investigate, if pid == -1,
++ * you should dump the current process's page tables
++ * @fake_pgd: base address of the fake pgd table
++ * @addr: base address in the user space that the page tables should map to
++ */
++
++SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
++				unsigned long __user, fake_pgd,
++				unsigned long __user, address)
++{
++	/* Qiming Chen */
++	struct mm_struct *mm;
++	struct vm_area_struct *user_vma = NULL;
++	struct vm_area_struct *pgd_user_vma = NULL;
++	struct vm_area_struct *curr_vma;
++	struct expose_pg_addrs *pg_addrs;
++	struct task_struct *task;
++	int ret;
++	unsigned long page_table_size =
++			PAGE_SIZE * PTRS_PER_PGD * PTRS_PER_PUD * PTRS_PER_PMD;
++	unsigned long pgd_size = PTRS_PER_PGD * sizeof(unsigned long);
++
++	/* self */
++	if (pid == -1) {
++		task = current;
++		mm = current->mm;
++	}
++	else {
++		task = find_task_by_vpid(pid);
++		if (!task)
++			return -EINVAL;
++		mm = task->mm;
++	}
++	/* check mm exist */
++	if (!mm)
++		return -EINVAL;
++	printk("got mm\n");
++	pg_addrs = kmalloc(sizeof(struct expose_pg_addrs), GFP_KERNEL);
++	if (!pg_addrs)
++		return -EFAULT;
++
++	INIT_LIST_HEAD(&pg_addrs->list);
++	pg_addrs->task = task;
++
++	/* lock */
++	down_read(&(mm->mmap_sem));
++
++	/* check user address valid */
++	user_vma = check_user_vma_is_valid(current->mm, address,
++		page_table_size);
++	if (!user_vma) {
++		kfree(pg_addrs);
++		up_read(&(mm->mmap_sem));
++		return -EINVAL;
++	}
++	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
++	printk("checked add\n");
++	/* PGD */
++	pgd_user_vma = check_user_vma_is_valid(current->mm, fake_pgd,
++		pgd_size);
++	if (!pgd_user_vma) {
++		kfree(pg_addrs);
++		up_read(&(mm->mmap_sem));
++		return -EINVAL;
++	}
++	pgd_user_vma->vm_flags = pgd_user_vma->vm_flags & ~VM_SHARED;
++	pg_addrs->address = (void*)address;
++	printk("checked pgd\n");
++	/* add the new pg_addrs to the list */
++	if (mm->pg_addrs)
++		list_add(&(pg_addrs->list), &(mm->pg_addrs->list));
++	else
++		mm->pg_addrs = pg_addrs;
++
++	/* get the list of VMAs */
++	curr_vma = mm->mmap;
++
++	/* go through the list of VMAs and copy the PTEs */
++	do {
++		printk("copy\n");
++		ret = copy_ptes(mm, curr_vma, user_vma, (void *)address,
++			(void *)fake_pgd);
++		if (ret < 0){
++			/*
++			if (mm->pg_addrs == pg_addrs)
++				mm->pg_addrs == NULL;
++			else
++				list_remove(pg_addrs->list);
++			kfree(pg_addrs);
++			*/
++			up_read(&(mm->mmap_sem));
++			return ret;
++		}
++		curr_vma = curr_vma->vm_next;
++	} while (curr_vma);
++
++	/* unlock */
++	up_read(&(mm->mmap_sem));
++
++	return 0;
++}
+diff --git a/flo-kernel/mm/memory.c b/flo-kernel/mm/memory.c
+index a240b04..12f4f03 100644
+--- a/flo-kernel/mm/memory.c
++++ b/flo-kernel/mm/memory.c
+@@ -2200,7 +2200,7 @@ static int remap_pte_range(struct mm_struct *mm, pmd_t *pmd,
+ 		return -ENOMEM;
+ 	arch_enter_lazy_mmu_mode();
+ 	do {
+-		BUG_ON(!pte_none(*pte));
++		/* BUG_ON(!pte_none(*pte)); */
+ 		set_pte_at(mm, addr, pte, pte_mkspecial(pfn_pte(pfn, prot)));
+ 		pfn++;
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
+diff --git a/vm_inspector/vm_inspector.c b/vm_inspector/vm_inspector.c
+index 5282df3..70b017f 100644
+--- a/vm_inspector/vm_inspector.c
++++ b/vm_inspector/vm_inspector.c
+@@ -1,7 +1,116 @@
+ #include <stdio.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <sys/types.h>
++#include <sys/syscall.h>
++#include <errno.h>
++#include <string.h>
++#include <sys/fcntl.h>
++#include <sys/mman.h>
+ 
+-int main(int argc, char **argv)
++#define PAGE_TABLE_SIZE (4*1024*1024) /* 4mb */
++#define PGD_SIZE (2048*4)
++
++static int pgnum2index(int num)
++{
++	return (((num / 512 * 4096) / 4) + (num % 512));
++}
++
++#define young_bit(pte)  ((pte & (1<<1))  >> 1)
++#define file_bit(pte)   ((pte & (1<<2))  >> 2)
++#define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
++#define rdonly_bit(pte) ((pte & (1<<7))  >> 7)
++/* citation
++ http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/BGEIHGIF.html
++*/
++#define xn_bit(pte)   ((pte & (1<<9))  >> 9)
++#define phys(pte)   (pte >> 12)
++
++static int expose(int pid, void *pgd_addr, void *addr)
+ {
+-	printf("shit\n");
++	if (syscall(378, pid, (unsigned long)pgd_addr,
++			(unsigned long)addr) < 0) {
++		printf("Error: expose_page_table syscall\n");
++		return -1;
++	}
++	if (pgd_addr == NULL)
++		return -1;
++	if (addr == NULL)
++		return -1;
++	/*
++	 * printf("***********%p ", addr);
++	 * int i = 0;
++	 * for ( i = 0; i < PGD_SIZE * 2; i++) {
++	 *	if (((unsigned long*)pgd_addr)[i] != 0)
++	 *		printf("***********%d\n", i);
++	 *}
++	 */
+ 	return 0;
+ }
++
++int main(int argc, char **argv)
++{
++	int i;
++	unsigned long *page = NULL;
++	/* unsigned long *pgd_i = NULL; */
++	int pid;
++	int verbose = 0;
++
++	if(argc != 3 && argc != 2)
++		return -1;
++
++	if(argv[1][0] == '-' && argv[1][1] == 'v')
++		verbose = 1;
++
++	/* last argument is pid*/
++	pid = atoi(argv[argc-1]);
++
++	int fd = open("/dev/zero", O_RDONLY);
++	unsigned long *pte_addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
++				MAP_SHARED, fd, 0);
++	unsigned long *pgd_addr = malloc(PGD_SIZE * 2 * sizeof(unsigned long));
++	close(fd);
++
++	if (pte_addr == MAP_FAILED) {
++		printf("Error: mmap\n");
++		return -1;
++	}
++	if (pgd_addr == MAP_FAILED) {
++		printf("Error: mmap\n");
++		return -1;
++	}
++
++	if(expose(pid, pgd_addr, pte_addr) < 0)
++		return -1;
++
++	/* iterate all entries of ptes */
++	for (i = 0; i < PAGE_TABLE_SIZE / sizeof(int); i++) {
++		page = &pte_addr[pgnum2index(i)];
++
++		if (page == NULL)
++			continue;
++		if (*page == 0) {
++			if (verbose)
++				printf("0x400 0x10000000 0 0 0 0 0 0\n");
++			continue;
++		}
++		printf("0x%x ", i/256);
++		/* printf("%p", (void *)pgd_i[1]); */
++		printf("0x%x ", i*4096);
++		printf("%p ", (void *)phys(*page));
++		printf("%lu ", young_bit(*page));
++		printf("%lu ", file_bit(*page));
++		printf("%lu ", dirty_bit(*page));
++		printf("%lu ", rdonly_bit(*page));
++		printf("%lu ", xn_bit(*page));
++		printf("\n");
++	}
++
++	munmap(pte_addr, PAGE_TABLE_SIZE * 2);
++	munmap(pgd_addr, PGD_SIZE * 2);
++
++        pgd_addr = NULL;
++	pte_addr = NULL;
++        page = NULL;
++        return 0;
++}

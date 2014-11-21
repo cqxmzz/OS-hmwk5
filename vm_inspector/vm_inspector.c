@@ -12,10 +12,7 @@
 #define PGD_SIZE (2048*4)
 
 static int pgnum2index(int num)
-{
 	return (((num / 512 * 4096) / 4) + (num % 512));
-}
-
 #define young_bit(pte)  ((pte & (1<<1))  >> 1)
 #define file_bit(pte)   ((pte & (1<<2))  >> 2)
 #define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
@@ -56,10 +53,10 @@ int main(int argc, char **argv)
 	int pid;
 	int verbose = 0;
 
-	if(argc != 3 && argc != 2)
+	if (argc != 3 && argc != 2)
 		return -1;
 
-	if(argv[1][0] == '-' && argv[1][1] == 'v')
+	if (argv[1][0] == '-' && argv[1][1] == 'v')
 		verbose = 1;
 
 	/* last argument is pid*/
@@ -80,7 +77,7 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
-	if(expose(pid, pgd_addr, pte_addr) < 0)
+	if (expose(pid, pgd_addr, pte_addr) < 0)
 		return -1;
 
 	/* iterate all entries of ptes */
@@ -108,9 +105,8 @@ int main(int argc, char **argv)
 
 	munmap(pte_addr, PAGE_TABLE_SIZE * 2);
 	munmap(pgd_addr, PGD_SIZE * 2);
-
-        pgd_addr = NULL;
+	pgd_addr = NULL;
 	pte_addr = NULL;
-        page = NULL;
-        return 0;
+	page = NULL;
+	return 0;
 }
