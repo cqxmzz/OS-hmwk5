@@ -58,10 +58,10 @@ index 3de3acb..23e3887 100644
  #endif
 diff --git a/flo-kernel/mm/expose_page_table.c b/flo-kernel/mm/expose_page_table.c
 new file mode 100644
-index 0000000..f1295fa
+index 0000000..dc9ee0d
 --- /dev/null
 +++ b/flo-kernel/mm/expose_page_table.c
-@@ -0,0 +1,244 @@
+@@ -0,0 +1,243 @@
 +#include <linux/kernel.h>
 +#include <linux/sched.h>
 +#include <linux/syscalls.h>
@@ -103,10 +103,10 @@ index 0000000..f1295fa
 +
 +	mapped_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE  * PAGE_SIZE;
 +	mapped_addr += ((unsigned long)pte_addr);
-+	
++
 +	write_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE * 4;
 +	write_addr += ((unsigned long)pgd_addr);
-+	
++
 +	ret = copy_to_user((void *)write_addr, &mapped_addr,
 +		sizeof(unsigned long));
 +	if (ret < 0)
@@ -121,7 +121,7 @@ index 0000000..f1295fa
 +	pud_t *pud;
 +	pmd_t *pmd;
 +	pte_t *pte;
-+	struct page * page;
++	struct page *page;
 +	int ret;
 +	unsigned long next;
 +	unsigned long addr = vma->vm_start;
@@ -158,7 +158,7 @@ index 0000000..f1295fa
 +	return 0;
 +}
 +
-+static struct vm_area_struct * check_user_vma_is_valid(struct mm_struct *mm,
++static struct vm_area_struct *check_user_vma_is_valid(struct mm_struct *mm,
 +	unsigned long address, unsigned long size)
 +{
 +	struct list_head *pglist;
@@ -177,7 +177,7 @@ index 0000000..f1295fa
 +		return NULL;
 +
 +	/* Check address does not belong to another address' vma*/
-+	p=&init_task;
++	p = &init_task;
 +	list_for_each(pos, &p->tasks) {
 +		task = list_entry(pos, struct task_struct, tasks);
 +		taskmm = task->mm;
@@ -231,8 +231,7 @@ index 0000000..f1295fa
 +	if (pid == -1) {
 +		task = current;
 +		mm = current->mm;
-+	}
-+	else {
++	} else {
 +		task = find_task_by_vpid(pid);
 +		if (!task)
 +			return -EINVAL;
@@ -271,7 +270,7 @@ index 0000000..f1295fa
 +		return -EINVAL;
 +	}
 +	pgd_user_vma->vm_flags = pgd_user_vma->vm_flags & ~VM_SHARED;
-+	pg_addrs->address = (void*)address;
++	pg_addrs->address = (void *)address;
 +	printk("checked pgd\n");
 +	/* add the new pg_addrs to the list */
 +	if (mm->pg_addrs)
@@ -287,7 +286,7 @@ index 0000000..f1295fa
 +		printk("copy\n");
 +		ret = copy_ptes(mm, curr_vma, user_vma, (void *)address,
 +			(void *)fake_pgd);
-+		if (ret < 0){
++		if (ret < 0) {
 +			/*
 +			if (mm->pg_addrs == pg_addrs)
 +				mm->pg_addrs == NULL;
@@ -320,10 +319,10 @@ index a240b04..12f4f03 100644
  		pfn++;
  	} while (pte++, addr += PAGE_SIZE, addr != end);
 diff --git a/vm_inspector/vm_inspector.c b/vm_inspector/vm_inspector.c
-index 5282df3..70b017f 100644
+index 5282df3..a53ca5d 100644
 --- a/vm_inspector/vm_inspector.c
 +++ b/vm_inspector/vm_inspector.c
-@@ -1,7 +1,116 @@
+@@ -1,7 +1,112 @@
  #include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
@@ -333,16 +332,12 @@ index 5282df3..70b017f 100644
 +#include <string.h>
 +#include <sys/fcntl.h>
 +#include <sys/mman.h>
- 
--int main(int argc, char **argv)
++
 +#define PAGE_TABLE_SIZE (4*1024*1024) /* 4mb */
 +#define PGD_SIZE (2048*4)
 +
 +static int pgnum2index(int num)
-+{
 +	return (((num / 512 * 4096) / 4) + (num % 512));
-+}
-+
 +#define young_bit(pte)  ((pte & (1<<1))  >> 1)
 +#define file_bit(pte)   ((pte & (1<<2))  >> 2)
 +#define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
@@ -354,8 +349,7 @@ index 5282df3..70b017f 100644
 +#define phys(pte)   (pte >> 12)
 +
 +static int expose(int pid, void *pgd_addr, void *addr)
- {
--	printf("shit\n");
++{
 +	if (syscall(378, pid, (unsigned long)pgd_addr,
 +			(unsigned long)addr) < 0) {
 +		printf("Error: expose_page_table syscall\n");
@@ -373,21 +367,22 @@ index 5282df3..70b017f 100644
 +	 *		printf("***********%d\n", i);
 +	 *}
 +	 */
- 	return 0;
- }
-+
-+int main(int argc, char **argv)
-+{
++	return 0;
++}
+ 
+ int main(int argc, char **argv)
+ {
+-	printf("shit\n");
 +	int i;
 +	unsigned long *page = NULL;
 +	/* unsigned long *pgd_i = NULL; */
 +	int pid;
 +	int verbose = 0;
 +
-+	if(argc != 3 && argc != 2)
++	if (argc != 3 && argc != 2)
 +		return -1;
 +
-+	if(argv[1][0] == '-' && argv[1][1] == 'v')
++	if (argv[1][0] == '-' && argv[1][1] == 'v')
 +		verbose = 1;
 +
 +	/* last argument is pid*/
@@ -408,7 +403,7 @@ index 5282df3..70b017f 100644
 +		return -1;
 +	}
 +
-+	if(expose(pid, pgd_addr, pte_addr) < 0)
++	if (expose(pid, pgd_addr, pte_addr) < 0)
 +		return -1;
 +
 +	/* iterate all entries of ptes */
@@ -436,9 +431,8 @@ index 5282df3..70b017f 100644
 +
 +	munmap(pte_addr, PAGE_TABLE_SIZE * 2);
 +	munmap(pgd_addr, PGD_SIZE * 2);
-+
-+        pgd_addr = NULL;
++	pgd_addr = NULL;
 +	pte_addr = NULL;
-+        page = NULL;
-+        return 0;
-+}
++	page = NULL;
+ 	return 0;
+ }

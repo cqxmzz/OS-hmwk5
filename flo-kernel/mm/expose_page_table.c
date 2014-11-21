@@ -176,7 +176,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	/* check mm exist */
 	if (!mm)
 		return -EINVAL;
-	printk("got mm\n");
 	pg_addrs = kmalloc(sizeof(struct expose_pg_addrs), GFP_KERNEL);
 	if (!pg_addrs)
 		return -EFAULT;
@@ -196,7 +195,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		return -EINVAL;
 	}
 	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
-	printk("checked add\n");
+
 	/* PGD */
 	pgd_user_vma = check_user_vma_is_valid(current->mm, fake_pgd,
 		pgd_size);
@@ -207,7 +206,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 	}
 	pgd_user_vma->vm_flags = pgd_user_vma->vm_flags & ~VM_SHARED;
 	pg_addrs->address = (void *)address;
-	printk("checked pgd\n");
+
 	/* add the new pg_addrs to the list */
 	if (mm->pg_addrs)
 		list_add(&(pg_addrs->list), &(mm->pg_addrs->list));
@@ -219,7 +218,6 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 
 	/* go through the list of VMAs and copy the PTEs */
 	do {
-		printk("copy\n");
 		ret = copy_ptes(mm, curr_vma, user_vma, (void *)address,
 			(void *)fake_pgd);
 		if (ret < 0) {

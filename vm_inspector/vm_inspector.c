@@ -3,7 +3,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
-#include <errno.h>
 #include <string.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
@@ -12,13 +11,16 @@
 #define PGD_SIZE (2048*4)
 
 static int pgnum2index(int num)
-	return (((num / 512 * 4096) / 4) + (num % 512));
+{
+	return ((num / 512 * 4096) / 4) + (num % 512);
+}
 #define young_bit(pte)  ((pte & (1<<1))  >> 1)
 #define file_bit(pte)   ((pte & (1<<2))  >> 2)
 #define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
 #define rdonly_bit(pte) ((pte & (1<<7))  >> 7)
 /* citation
- http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/BGEIHGIF.html
+ * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/
+ * BGEIHGIF.html
 */
 #define xn_bit(pte)   ((pte & (1<<9))  >> 9)
 #define phys(pte)   (pte >> 12)
