@@ -58,10 +58,10 @@ index 3de3acb..23e3887 100644
  #endif
 diff --git a/flo-kernel/mm/expose_page_table.c b/flo-kernel/mm/expose_page_table.c
 new file mode 100644
-index 0000000..dc9ee0d
+index 0000000..e6ad28d
 --- /dev/null
 +++ b/flo-kernel/mm/expose_page_table.c
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,241 @@
 +#include <linux/kernel.h>
 +#include <linux/sched.h>
 +#include <linux/syscalls.h>
@@ -240,7 +240,6 @@ index 0000000..dc9ee0d
 +	/* check mm exist */
 +	if (!mm)
 +		return -EINVAL;
-+	printk("got mm\n");
 +	pg_addrs = kmalloc(sizeof(struct expose_pg_addrs), GFP_KERNEL);
 +	if (!pg_addrs)
 +		return -EFAULT;
@@ -260,7 +259,7 @@ index 0000000..dc9ee0d
 +		return -EINVAL;
 +	}
 +	user_vma->vm_flags = user_vma->vm_flags & ~VM_SHARED;
-+	printk("checked add\n");
++
 +	/* PGD */
 +	pgd_user_vma = check_user_vma_is_valid(current->mm, fake_pgd,
 +		pgd_size);
@@ -271,7 +270,7 @@ index 0000000..dc9ee0d
 +	}
 +	pgd_user_vma->vm_flags = pgd_user_vma->vm_flags & ~VM_SHARED;
 +	pg_addrs->address = (void *)address;
-+	printk("checked pgd\n");
++
 +	/* add the new pg_addrs to the list */
 +	if (mm->pg_addrs)
 +		list_add(&(pg_addrs->list), &(mm->pg_addrs->list));
@@ -283,7 +282,6 @@ index 0000000..dc9ee0d
 +
 +	/* go through the list of VMAs and copy the PTEs */
 +	do {
-+		printk("copy\n");
 +		ret = copy_ptes(mm, curr_vma, user_vma, (void *)address,
 +			(void *)fake_pgd);
 +		if (ret < 0) {
@@ -319,16 +317,15 @@ index a240b04..12f4f03 100644
  		pfn++;
  	} while (pte++, addr += PAGE_SIZE, addr != end);
 diff --git a/vm_inspector/vm_inspector.c b/vm_inspector/vm_inspector.c
-index 5282df3..a53ca5d 100644
+index 5282df3..7637458 100644
 --- a/vm_inspector/vm_inspector.c
 +++ b/vm_inspector/vm_inspector.c
-@@ -1,7 +1,112 @@
+@@ -1,7 +1,114 @@
  #include <stdio.h>
 +#include <stdlib.h>
 +#include <unistd.h>
 +#include <sys/types.h>
 +#include <sys/syscall.h>
-+#include <errno.h>
 +#include <string.h>
 +#include <sys/fcntl.h>
 +#include <sys/mman.h>
@@ -337,13 +334,16 @@ index 5282df3..a53ca5d 100644
 +#define PGD_SIZE (2048*4)
 +
 +static int pgnum2index(int num)
-+	return (((num / 512 * 4096) / 4) + (num % 512));
++{
++	return ((num / 512 * 4096) / 4) + (num % 512);
++}
 +#define young_bit(pte)  ((pte & (1<<1))  >> 1)
 +#define file_bit(pte)   ((pte & (1<<2))  >> 2)
 +#define dirty_bit(pte)  ((pte & (1<<6))  >> 6)
 +#define rdonly_bit(pte) ((pte & (1<<7))  >> 7)
 +/* citation
-+ http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/BGEIHGIF.html
++ * http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/
++ * BGEIHGIF.html
 +*/
 +#define xn_bit(pte)   ((pte & (1<<9))  >> 9)
 +#define phys(pte)   (pte >> 12)

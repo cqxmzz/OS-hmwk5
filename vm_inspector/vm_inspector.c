@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/fcntl.h>
 #include <sys/mman.h>
+#include <errno.h>
 
 #define PAGE_TABLE_SIZE (4*1024*1024) /* 4mb */
 #define PGD_SIZE (2048*4)
@@ -30,12 +31,12 @@ static int expose(int pid, void *pgd_addr, void *addr)
 	if (syscall(378, pid, (unsigned long)pgd_addr,
 			(unsigned long)addr) < 0) {
 		printf("Error: expose_page_table syscall\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (pgd_addr == NULL)
-		return -1;
+		return -EINVAL;
 	if (addr == NULL)
-		return -1;
+		return -EINVAL;
 	/*
 	 * printf("***********%p ", addr);
 	 * int i = 0;
@@ -56,7 +57,7 @@ int main(int argc, char **argv)
 	int verbose = 0;
 
 	if (argc != 3 && argc != 2)
-		return -1;
+		return -EINVAL;
 
 	if (argv[1][0] == '-' && argv[1][1] == 'v')
 		verbose = 1;
@@ -72,15 +73,15 @@ int main(int argc, char **argv)
 
 	if (pte_addr == MAP_FAILED) {
 		printf("Error: mmap\n");
-		return -1;
+		return -EINVAL;
 	}
 	if (pgd_addr == MAP_FAILED) {
 		printf("Error: mmap\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	if (expose(pid, pgd_addr, pte_addr) < 0)
-		return -1;
+		return -EINVAL;
 
 	/* iterate all entries of ptes */
 	for (i = 0; i < PAGE_TABLE_SIZE / sizeof(int); i++) {
