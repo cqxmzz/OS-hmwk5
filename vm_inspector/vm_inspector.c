@@ -51,8 +51,14 @@ static int expose(int pid, void *pgd_addr, void *addr)
 		return -1;
 	if (addr == NULL)
 		return -1;
-	// printf("%p ", addr);
-	// printf("%p ", pgd_addr[0]);
+	/*
+	 * printf("***********%p ", addr);
+	 * int i = 0;
+	 * for ( i = 0; i < PGD_SIZE * 2; i++) {
+	 *	if (((unsigned long*)pgd_addr)[i] != 0)
+	 *		printf("***********%d\n", i);
+	 *}
+	 */
 	return 0;
 }
 
@@ -76,8 +82,7 @@ int main(int argc, char **argv)
 	int fd = open("/dev/zero", O_RDONLY);
 	unsigned long *pte_addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
 				MAP_SHARED, fd, 0);
-	unsigned long *pgd_addr = mmap(NULL, PGD_SIZE * 2, PROT_READ,
-				MAP_SHARED, fd, 0);
+	unsigned long *pgd_addr = malloc(PGD_SIZE * 2 * sizeof(unsigned long));
 	close(fd);
 
 	if (pte_addr == MAP_FAILED) {

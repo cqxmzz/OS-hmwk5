@@ -43,7 +43,7 @@ static int copy_pgd_to_user(unsigned long addr, void *pte_addr, void *pgd_addr)
 	write_addr = (addr >> PAGE_SHIFT) / PTRS_PER_PTE * 4;
 	write_addr += ((unsigned long)pgd_addr);
 	
-	ret = copy_to_user((void *)write_addr, mapped_addr,
+	ret = copy_to_user((void *)write_addr, &mapped_addr,
 		sizeof(unsigned long));
 	if (ret < 0)
 		return ret;
