@@ -169,7 +169,7 @@ SYSCALL_DEFINE3(expose_page_table, pid_t __user, pid,
 		mm = current->mm;
 	}
 	else {
-		task = find_task_by_pid(pid);
+		task = find_task_by_vpid(pid);
 		if (!task)
 			return -EINVAL;
 		mm = task->mm;

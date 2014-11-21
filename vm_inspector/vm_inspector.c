@@ -60,7 +60,7 @@ int main(int argc, char **argv)
 {
 	int i;
 	unsigned long *page = NULL;
-	unsigned long *pgd_i = NULL;
+	//unsigned long *pgd_i = NULL;
 	int pid;
 	int verbose = 0;
 
