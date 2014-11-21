@@ -23,7 +23,7 @@ static int pgnum2index(int num)
 /* citation
  http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0360f/BGEIHGIF.html
 */
-#define xn_bit(pte)   (pte & 1)
+#define xn_bit(pte)   ((pte & (1<<9))  >> 9)
 #define phys(pte)   (pte >> 12)
 
 static int expose(int pid, void *pgd_addr, void *addr)
@@ -52,7 +52,7 @@ static int expose(int pid, void *pgd_addr, void *addr)
 	if (addr == NULL)
 		return -1;
 	// printf("%p ", addr);
-	// printf("%p ", pgd_addr[1]);
+	// printf("%p ", pgd_addr[0]);
 	return 0;
 }
 
@@ -92,12 +92,6 @@ int main(int argc, char **argv)
 	if(expose(pid, pgd_addr, pte_addr) < 0)
 		return -1;
 
-	/* itrate the fake_pgd, find valid entry */
-	for (pgd_i = pgd_addr; pgd_i - pgd_addr < 4096; pgd_i += 2) {
-		if ( (void *)pgd_i[1] != NULL)
-			break;
-	}
-
 	/* iterate all entries of ptes */
 	for (i = 0; i < PAGE_TABLE_SIZE / sizeof(int); i++) {
 		page = &pte_addr[pgnum2index(i)];
@@ -109,9 +103,9 @@ int main(int argc, char **argv)
 				printf("0x400 0x10000000 0 0 0 0 0 0\n");
 			continue;
 		}
-		/* printf("%x ", i); */
-		printf("%p", (void *)pgd_i[1]);
-		printf("%p ", page);
+		printf("0x%x ", i/256);
+		//printf("%p", (void *)pgd_i[1]);
+		printf("0x%x ", i*4096);
 		printf("%p ", (void *)phys(*page));
 		printf("%lu ", young_bit(*page));
 		printf("%lu ", file_bit(*page));
