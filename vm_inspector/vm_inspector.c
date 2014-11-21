@@ -37,7 +37,6 @@ static int expose(int pid, void *pgd_addr, void *addr)
 		return -1;
 	if (addr == NULL)
 		return -1;
-<<<<<<< HEAD
 	/*
 	 * printf("***********%p ", addr);
 	 * int i = 0;
@@ -46,9 +45,6 @@ static int expose(int pid, void *pgd_addr, void *addr)
 	 *		printf("***********%d\n", i);
 	 *}
 	 */
-=======
-
->>>>>>> 2016d2fcca1676f7f115df1f86315b0f83eb7f5f
 	return 0;
 }
 
