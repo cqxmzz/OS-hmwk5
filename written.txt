@@ -1,3 +1,5 @@
+citation: http://developer.android.com/guide/components/fundamentals.html
+
 They share objects like:
 
 
