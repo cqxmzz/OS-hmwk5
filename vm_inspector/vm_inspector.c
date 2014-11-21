@@ -28,20 +28,6 @@ static int pgnum2index(int num)
 
 static int expose(int pid, void *pgd_addr, void *addr)
 {
-	// int fd = open("/dev/zero", O_RDONLY);
-	// void *addr = mmap(NULL, PAGE_TABLE_SIZE * 2, PROT_READ,
-	// 			 MAP_SHARED, fd, 0);
-	// void *pgd_addr = mmap(NULL, PGD_SIZE * 2, PROT_READ,
-	// 			 MAP_SHARED, fd, 0);
-	// close(fd);
-	// if (addr == MAP_FAILED) {
-	// 	printf("Error: mmap\n");
-	// 	return NULL;
-	// }
-	// if (pgd_addr == MAP_FAILED) {
-	// 	printf("Error: mmap\n");
-	// 	return NULL;
-	// }
 	if (syscall(378, pid, (unsigned long)pgd_addr,
 			(unsigned long)addr) < 0) {
 		printf("Error: expose_page_table syscall\n");
@@ -51,8 +37,7 @@ static int expose(int pid, void *pgd_addr, void *addr)
 		return -1;
 	if (addr == NULL)
 		return -1;
-	// printf("%p ", addr);
-	// printf("%p ", pgd_addr[0]);
+
 	return 0;
 }
 
@@ -60,7 +45,7 @@ int main(int argc, char **argv)
 {
 	int i;
 	unsigned long *page = NULL;
-	//unsigned long *pgd_i = NULL;
+	/* unsigned long *pgd_i = NULL; */
 	int pid;
 	int verbose = 0;
 
@@ -104,7 +89,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 		printf("0x%x ", i/256);
-		//printf("%p", (void *)pgd_i[1]);
+		/* printf("%p", (void *)pgd_i[1]); */
 		printf("0x%x ", i*4096);
 		printf("%p ", (void *)phys(*page));
 		printf("%lu ", young_bit(*page));
